@@ -194,7 +194,7 @@ static long madvise_remove(struct vm_area_struct *vma,
 				struct vm_area_struct **prev,
 				unsigned long start, unsigned long end)
 {
-	struct address_space *mapping;
+	struct file *file;
 	loff_t offset, endoff;
 	int error;
 
@@ -211,7 +211,7 @@ static long madvise_remove(struct vm_area_struct *vma,
 	if ((vma->vm_flags & (VM_SHARED|VM_WRITE)) != (VM_SHARED|VM_WRITE))
 		return -EACCES;
 
-	mapping = vma->vm_file->f_mapping;
+	file = vma->vm_file;
 
 	offset = (loff_t)(start - vma->vm_start)
 			+ ((loff_t)vma->vm_pgoff << PAGE_SHIFT);
@@ -220,7 +220,7 @@ static long madvise_remove(struct vm_area_struct *vma,
 
 	/* vmtruncate_range needs to take i_mutex */
 	up_read(&current->mm->mmap_sem);
-	error = vmtruncate_range(mapping->host, offset, endoff);
+	error = vmtruncate_file_range(file, offset, endoff);
 	down_read(&current->mm->mmap_sem);
 	return error;
 }

@@ -1443,6 +1443,7 @@ static long shmem_fallocate(struct file *file, int mode,
 				loff_t offset, loff_t len)
 {
 	struct inode *inode = file->f_path.dentry->d_inode;
+	struct address_space *mapping = file->f_mapping;
 	pgoff_t start = offset >> PAGE_CACHE_SHIFT;
 	pgoff_t end = DIV_ROUND_UP((offset + len), PAGE_CACHE_SIZE);
 	pgoff_t index = start;
@@ -1451,6 +1452,12 @@ static long shmem_fallocate(struct file *file, int mode,
 	int ret = 0;
 
 	mutex_lock(&inode->i_mutex);
+
+	if (mapping) {
+		inode_dio_wait(mapping->host);
+		unmap_mapping_range(mapping, offset, len, 1);
+	}
+
 	i_size = inode->i_size;
 	if (mode & FALLOC_FL_PUNCH_HOLE) {
 		if (!(offset > i_size || (end << PAGE_CACHE_SHIFT) > i_size))
@@ -1481,6 +1488,10 @@ static long shmem_fallocate(struct file *file, int mode,
 	}
 	if (!(mode & FALLOC_FL_KEEP_SIZE) && (index << PAGE_CACHE_SHIFT) > i_size)
 		i_size_write(inode, index << PAGE_CACHE_SHIFT);
+
+	/* unmap again to remove racily COWed private pages */
+	if (mapping)
+		unmap_mapping_range(mapping, offset, len, 1);
 
 	goto unlock;
 
@@ -2356,7 +2367,6 @@ static const struct file_operations shmem_file_operations = {
 
 static const struct inode_operations shmem_inode_operations = {
 	.setattr	= shmem_setattr,
-	.truncate_range	= shmem_truncate_range,
 #ifdef CONFIG_TMPFS_XATTR
 	.setxattr	= shmem_setxattr,
 	.getxattr	= shmem_getxattr,
