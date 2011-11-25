@@ -20,7 +20,6 @@
 #include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/scatterlist.h>
-
 #include "tmio_mmc.h"
 
 #ifdef CONFIG_PM
